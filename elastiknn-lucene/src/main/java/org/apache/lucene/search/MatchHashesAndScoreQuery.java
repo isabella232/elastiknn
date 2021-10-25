@@ -32,14 +32,14 @@ public class MatchHashesAndScoreQuery extends Query {
     private final IndexReader indexReader;
     private final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder;
     private final Logger logger;
-    private final double maxScore;
+    private final double minScore;
 
     public MatchHashesAndScoreQuery(final String field,
                                     final HashAndFreq[] hashAndFrequencies,
                                     final int candidates,
                                     final IndexReader indexReader,
                                     final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder,
-                                    final double maxScore) {
+                                    final double minScore) {
         // `countMatches` expects hashes to be in sorted order.
         // java's sort seems to be faster than lucene's ArrayUtil.
         java.util.Arrays.sort(hashAndFrequencies, HashAndFreq::compareTo);
@@ -50,7 +50,7 @@ public class MatchHashesAndScoreQuery extends Query {
         this.indexReader = indexReader;
         this.scoreFunctionBuilder = scoreFunctionBuilder;
         this.logger = LogManager.getLogger(getClass().getName());
-        this.maxScore = maxScore;
+        this.minScore = minScore;
     }
 
     public MatchHashesAndScoreQuery(final String field,
@@ -106,7 +106,7 @@ public class MatchHashesAndScoreQuery extends Query {
                     KthGreatest.Result kgr = counter.kthGreatest(candidates);
 
                     // Return an iterator over the doc ids >= the min candidate count.
-                    return new MaxScoreDocIdSetIterator(counter,kgr,scoreFunction,candidates,maxScore);
+                    return new MaxScoreDocIdSetIterator(counter,kgr,scoreFunction,candidates, minScore);
                 }
             }
 

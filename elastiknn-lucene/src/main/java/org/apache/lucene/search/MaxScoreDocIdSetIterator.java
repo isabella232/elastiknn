@@ -2,8 +2,6 @@ package org.apache.lucene.search;
 
 import com.klibisz.elastiknn.search.HitCounter;
 
-import java.io.IOException;
-
 public class MaxScoreDocIdSetIterator extends DocIdSetIterator {
     // Important that this starts at -1. Need a boolean to denote that it has started iterating.
     private int docID = -1;
@@ -12,18 +10,18 @@ public class MaxScoreDocIdSetIterator extends DocIdSetIterator {
     private final HitCounter counter;
     private final KthGreatest.Result kgr;
     private final MatchHashesAndScoreQuery.ScoreFunction scoreFunction;
-    private final double maxScore;
+    private final double minScore;
     private final int candidates;
     // Track the number of ids emitted, and the number of ids with count = kgr.kthGreatest emitted.
     private int numEmitted = 0;
     private int numEq = 0;
 
-    public MaxScoreDocIdSetIterator(HitCounter hitCounter, KthGreatest.Result kgr, MatchHashesAndScoreQuery.ScoreFunction scoreFunction, int candidates,double maxScore) {
+    public MaxScoreDocIdSetIterator(HitCounter hitCounter, KthGreatest.Result kgr, MatchHashesAndScoreQuery.ScoreFunction scoreFunction, int candidates,double minScore) {
         this.counter = hitCounter;
         this.kgr = kgr;
         this.scoreFunction = scoreFunction;
         this.candidates = candidates;
-        this.maxScore = maxScore;
+        this.minScore = minScore;
     }
 
 
@@ -55,7 +53,7 @@ public class MaxScoreDocIdSetIterator extends DocIdSetIterator {
                 docID++;
                 if (counter.get(docID) > kgr.kthGreatest) {
                     double score = scoreFunction.score(docID(), counter.get(docID()));
-                    if (score > 4) {
+                    if (score > minScore) {
                         numEmitted++;
                         curScore = score;
                         return docID();
@@ -63,7 +61,7 @@ public class MaxScoreDocIdSetIterator extends DocIdSetIterator {
 
                 } else if (counter.get(docID) == kgr.kthGreatest && numEq < candidates - kgr.numGreaterThan) {
                     double score = scoreFunction.score(docID(), counter.get(docID()));
-                    if (score > 4) {
+                    if (score > minScore) {
                         numEq++;
                         numEmitted++;
                         curScore = score;

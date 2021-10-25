@@ -11,16 +11,19 @@ public class MaxScoreDocIdSetIterator extends DocIdSetIterator {
     private final KthGreatest.Result kgr;
     private final MatchHashesAndScoreQuery.ScoreFunction scoreFunction;
     private final double minScore;
+    private final int maxCandidatesToEvaluate;
     private final int candidates;
     // Track the number of ids emitted, and the number of ids with count = kgr.kthGreatest emitted.
     private int numEmitted = 0;
     private int numEq = 0;
+    private int scannedDocs = 0;
 
-    public MaxScoreDocIdSetIterator(HitCounter hitCounter, KthGreatest.Result kgr, MatchHashesAndScoreQuery.ScoreFunction scoreFunction, int candidates,double minScore) {
+    public MaxScoreDocIdSetIterator(HitCounter hitCounter, KthGreatest.Result kgr, MatchHashesAndScoreQuery.ScoreFunction scoreFunction, int candidates,int maxCandidatesToEvaluate,double minScore) {
         this.counter = hitCounter;
         this.kgr = kgr;
         this.scoreFunction = scoreFunction;
         this.candidates = candidates;
+        this.maxCandidatesToEvaluate = maxCandidatesToEvaluate;
         this.minScore = minScore;
     }
 
@@ -45,12 +48,13 @@ public class MaxScoreDocIdSetIterator extends DocIdSetIterator {
         // Ensure that docs with count = kgr.kthGreatest are only emitted when there are fewer
         // than `candidates` docs with count > kgr.kthGreatest.
         while (true) {
-            if (numEmitted == candidates || docID + 1 > counter.maxKey()) {
+            if (scannedDocs > maxCandidatesToEvaluate || numEmitted == candidates || docID + 1 > counter.maxKey()) {
                 docID = DocIdSetIterator.NO_MORE_DOCS;
                 curScore = 0;
                 return docID();
             } else {
                 docID++;
+                scannedDocs++;
                 if (counter.get(docID) > kgr.kthGreatest) {
                     double score = scoreFunction.score(docID(), counter.get(docID()));
                     if (score > minScore) {

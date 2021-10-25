@@ -33,13 +33,15 @@ public class MatchHashesAndScoreQuery extends Query {
     private final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder;
     private final Logger logger;
     private final double minScore;
+    private final int maxCandidatesToEvaluate;
 
     public MatchHashesAndScoreQuery(final String field,
                                     final HashAndFreq[] hashAndFrequencies,
                                     final int candidates,
                                     final IndexReader indexReader,
                                     final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder,
-                                    final double minScore) {
+                                    final double minScore,
+                                    final int maxCandidatesToEvaluate) {
         // `countMatches` expects hashes to be in sorted order.
         // java's sort seems to be faster than lucene's ArrayUtil.
         java.util.Arrays.sort(hashAndFrequencies, HashAndFreq::compareTo);
@@ -51,6 +53,7 @@ public class MatchHashesAndScoreQuery extends Query {
         this.scoreFunctionBuilder = scoreFunctionBuilder;
         this.logger = LogManager.getLogger(getClass().getName());
         this.minScore = minScore;
+        this.maxCandidatesToEvaluate = maxCandidatesToEvaluate;
     }
 
     public MatchHashesAndScoreQuery(final String field,
@@ -59,7 +62,7 @@ public class MatchHashesAndScoreQuery extends Query {
                                     final IndexReader indexReader,
                                     final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder
                                     ) {
-        this(field, hashAndFrequencies, candidates, indexReader, scoreFunctionBuilder, Double.NEGATIVE_INFINITY);
+        this(field, hashAndFrequencies, candidates, indexReader, scoreFunctionBuilder, Double.NEGATIVE_INFINITY, Integer.MAX_VALUE);
     }
 
     @Override
@@ -106,7 +109,7 @@ public class MatchHashesAndScoreQuery extends Query {
                     KthGreatest.Result kgr = counter.kthGreatest(candidates);
 
                     // Return an iterator over the doc ids >= the min candidate count.
-                    return new MaxScoreDocIdSetIterator(counter,kgr,scoreFunction,candidates, minScore);
+                    return new MaxScoreDocIdSetIterator(counter,kgr,scoreFunction,candidates, maxCandidatesToEvaluate, minScore);
                 }
             }
 
@@ -188,6 +191,6 @@ public class MatchHashesAndScoreQuery extends Query {
 
     @Override
     public int hashCode() {
-        return Objects.hash(field, hashAndFrequencies, candidates, indexReader, scoreFunctionBuilder);
+        return Objects.hash(field, hashAndFrequencies, candidates, indexReader, scoreFunctionBuilder, maxCandidatesToEvaluate, minScore);
     }
 }

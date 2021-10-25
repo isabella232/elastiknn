@@ -13,6 +13,7 @@ import org.elasticsearch.common.lucene.search.function.{CombineFunction, LeafSco
 
 class HashingQuery[V <: Vec, S <: StoredVec](field: String,
                                              minScore: Double,
+                                             maxCandidatesToScan: Int,
                                              queryVec: V,
                                              candidates: Int,
                                              hashes: Array[HashAndFreq],
@@ -32,7 +33,8 @@ class HashingQuery[V <: Vec, S <: StoredVec](field: String,
       candidates,
       indexReader,
       scoreFunction,
-      minScore
+      minScore,
+      maxCandidatesToScan
     )
   }
 

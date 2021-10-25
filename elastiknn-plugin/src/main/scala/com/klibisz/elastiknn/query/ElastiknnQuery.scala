@@ -53,61 +53,76 @@ object ElastiknnQuery {
     (query, mapping) match {
 
       case (
-          Exact(f, Similarity.Jaccard, minScore: Double, v: Vec.SparseBool),
+          Exact(f, Similarity.Jaccard, minScore: Double, max_candidates_to_scan: Int, v: Vec.SparseBool),
           _: Mapping.SparseBool | _: Mapping.SparseIndexed | _: Mapping.JaccardLsh | _: Mapping.HammingLsh
           ) =>
         new ExactQuery(f, v, ESF.Jaccard)
 
       case (
-          Exact(f, Similarity.Hamming, minScore: Double, v: Vec.SparseBool),
+          Exact(f, Similarity.Hamming, minScore: Double, max_candidates_to_scan: Int, v: Vec.SparseBool),
           _: Mapping.SparseBool | _: Mapping.SparseIndexed | _: Mapping.JaccardLsh | _: Mapping.HammingLsh
           ) =>
         new ExactQuery(f, v, ESF.Hamming)
 
       case (
-          Exact(f, Similarity.L1, minScore: Double, v: Vec.DenseFloat),
+          Exact(f, Similarity.L1, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat),
           _: Mapping.DenseFloat | _: Mapping.CosineLsh | _: Mapping.L2Lsh | _: Mapping.PermutationLsh
           ) =>
         new ExactQuery(f, v, ESF.L1)
 
       case (
-          Exact(f, Similarity.L2, minScore: Double, v: Vec.DenseFloat),
+          Exact(f, Similarity.L2, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat),
           _: Mapping.DenseFloat | _: Mapping.CosineLsh | _: Mapping.L2Lsh | _: Mapping.PermutationLsh
           ) =>
         new ExactQuery(f, v, ESF.L2)
 
       case (
-          Exact(f, Similarity.Cosine, minScore: Double, v: Vec.DenseFloat),
+          Exact(f, Similarity.Cosine, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat),
           _: Mapping.DenseFloat | _: Mapping.CosineLsh | _: Mapping.L2Lsh | _: Mapping.PermutationLsh
           ) =>
         new ExactQuery(f, v, ESF.Cosine)
 
-      case (SparseIndexed(f, Similarity.Jaccard, minScore: Double, sbv: Vec.SparseBool), _: Mapping.SparseIndexed) =>
-        new SparseIndexedQuery(f,minScore, sbv, SparseIndexedSimilarityFunction.Jaccard)
+      case (
+          SparseIndexed(f, Similarity.Jaccard, minScore: Double, max_candidates_to_scan: Int, sbv: Vec.SparseBool),
+          _: Mapping.SparseIndexed
+          ) =>
+        new SparseIndexedQuery(f, minScore, max_candidates_to_scan, sbv, SparseIndexedSimilarityFunction.Jaccard)
 
-      case (SparseIndexed(f, Similarity.Hamming, minScore: Double, sbv: Vec.SparseBool), _: Mapping.SparseIndexed) =>
-        new SparseIndexedQuery(f,minScore, sbv, SparseIndexedSimilarityFunction.Hamming)
+      case (
+          SparseIndexed(f, Similarity.Hamming, minScore: Double, max_candidates_to_scan: Int, sbv: Vec.SparseBool),
+          _: Mapping.SparseIndexed
+          ) =>
+        new SparseIndexedQuery(f, minScore, max_candidates_to_scan, sbv, SparseIndexedSimilarityFunction.Hamming)
 
-      case (JaccardLsh(f, candidates, minScore: Double, v: Vec.SparseBool), m: Mapping.JaccardLsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.trueIndices, v.totalIndices), ESF.Jaccard)
+      case (JaccardLsh(f, candidates, minScore: Double, max_candidates_to_scan: Int, v: Vec.SparseBool), m: Mapping.JaccardLsh) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.trueIndices, v.totalIndices), ESF.Jaccard)
 
-      case (HammingLsh(f, candidates, minScore: Double, v: Vec.SparseBool), m: Mapping.HammingLsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.trueIndices, v.totalIndices), ESF.Hamming)
+      case (HammingLsh(f, candidates, minScore: Double, max_candidates_to_scan: Int, v: Vec.SparseBool), m: Mapping.HammingLsh) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.trueIndices, v.totalIndices), ESF.Hamming)
 
-      case (CosineLsh(f, candidates, minScore: Double, v: Vec.DenseFloat), m: Mapping.CosineLsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.values), ESF.Cosine)
+      case (CosineLsh(f, candidates, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat), m: Mapping.CosineLsh) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.values), ESF.Cosine)
 
-      case (L2Lsh(f, candidates, probes, minScore: Double, v: Vec.DenseFloat), m: Mapping.L2Lsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.values, probes), ESF.L2)
+      case (L2Lsh(f, candidates, probes, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat), m: Mapping.L2Lsh) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.values, probes), ESF.L2)
 
-      case (PermutationLsh(f, Similarity.Cosine, candidates, minScore: Double, v: Vec.DenseFloat), m: Mapping.PermutationLsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.values), ESF.Cosine)
+      case (
+          PermutationLsh(f, Similarity.Cosine, candidates, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat),
+          m: Mapping.PermutationLsh
+          ) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.values), ESF.Cosine)
 
-      case (PermutationLsh(f, Similarity.L2, candidates, minScore: Double, v: Vec.DenseFloat), m: Mapping.PermutationLsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.values), ESF.L2)
+      case (
+          PermutationLsh(f, Similarity.L2, candidates, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat),
+          m: Mapping.PermutationLsh
+          ) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.values), ESF.L2)
 
-      case (PermutationLsh(f, Similarity.L1, candidates, minScore: Double, v: Vec.DenseFloat), m: Mapping.PermutationLsh) =>
-        new HashingQuery(f, minScore, v, candidates, Cache(m).hash(v.values), ESF.L1)
+      case (
+          PermutationLsh(f, Similarity.L1, candidates, minScore: Double, max_candidates_to_scan: Int, v: Vec.DenseFloat),
+          m: Mapping.PermutationLsh
+          ) =>
+        new HashingQuery(f, minScore, max_candidates_to_scan, v, candidates, Cache(m).hash(v.values), ESF.L1)
 
       case _ => Failure(incompatible(query, mapping))
     }

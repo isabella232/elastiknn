@@ -12,7 +12,7 @@ import org.apache.lucene.search._
 import org.apache.lucene.util.BytesRef
 import org.elasticsearch.common.lucene.search.function.{CombineFunction, LeafScoreFunction, ScoreFunction}
 
-class SparseIndexedQuery(field: String, queryVec: Vec.SparseBool, simFunc: SparseIndexedSimilarityFunction)
+class SparseIndexedQuery(field: String, maxScore: Double, queryVec: Vec.SparseBool, simFunc: SparseIndexedSimilarityFunction)
     extends ElastiknnQuery[Vec.SparseBool] {
 
   import SparseIndexedQuery._
@@ -35,7 +35,8 @@ class SparseIndexedQuery(field: String, queryVec: Vec.SparseBool, simFunc: Spars
       trueIndexTerms,
       indexReader.getDocCount(field),
       indexReader,
-      scoreFunction
+      scoreFunction,
+      maxScore
     )
 
   override def toScoreFunction(indexReader: IndexReader): ScoreFunction = {

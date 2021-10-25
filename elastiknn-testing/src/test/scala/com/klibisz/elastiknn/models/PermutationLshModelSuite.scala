@@ -63,7 +63,7 @@ class PermutationLshModelSuite extends AnyFunSuite with Matchers with LuceneSupp
     }
   }
 
-  test("model is invariant to vector magnitude") {
+  test( "model is invariant to vector magnitude") {
     implicit val rng: Random = new Random(0)
     val dims = 10
     for {

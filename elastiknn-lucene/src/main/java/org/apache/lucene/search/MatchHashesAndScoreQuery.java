@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
+import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 /**
@@ -31,12 +32,14 @@ public class MatchHashesAndScoreQuery extends Query {
     private final IndexReader indexReader;
     private final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder;
     private final Logger logger;
+    private final double maxScore;
 
     public MatchHashesAndScoreQuery(final String field,
                                     final HashAndFreq[] hashAndFrequencies,
                                     final int candidates,
                                     final IndexReader indexReader,
-                                    final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder) {
+                                    final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder,
+                                    final double maxScore) {
         // `countMatches` expects hashes to be in sorted order.
         // java's sort seems to be faster than lucene's ArrayUtil.
         java.util.Arrays.sort(hashAndFrequencies, HashAndFreq::compareTo);
@@ -47,6 +50,16 @@ public class MatchHashesAndScoreQuery extends Query {
         this.indexReader = indexReader;
         this.scoreFunctionBuilder = scoreFunctionBuilder;
         this.logger = LogManager.getLogger(getClass().getName());
+        this.maxScore = maxScore;
+    }
+
+    public MatchHashesAndScoreQuery(final String field,
+                                    final HashAndFreq[] hashAndFrequencies,
+                                    final int candidates,
+                                    final IndexReader indexReader,
+                                    final Function<LeafReaderContext, ScoreFunction> scoreFunctionBuilder
+                                    ) {
+        this(field, hashAndFrequencies, candidates, indexReader, scoreFunctionBuilder, Double.NEGATIVE_INFINITY);
     }
 
     @Override
@@ -73,7 +86,7 @@ public class MatchHashesAndScoreQuery extends Query {
                         if (counter.numHits() < counterLimit && termsEnum.seekExact(new BytesRef(hf.hash))) {
                             docs = termsEnum.postings(docs, PostingsEnum.NONE);
                             while (docs.nextDoc() != DocIdSetIterator.NO_MORE_DOCS && counter.numHits() < counterLimit) {
-                                counter.increment(docs.docID(), min(hf.freq, docs.freq()));
+                                    counter.increment(docs.docID(), min(hf.freq, docs.freq()));
                             }
                         }
                     }
@@ -81,7 +94,7 @@ public class MatchHashesAndScoreQuery extends Query {
                 }
             }
 
-            private DocIdSetIterator buildDocIdSetIterator(HitCounter counter) {
+            private DocIdSetIterator buildDocIdSetIterator(HitCounter counter,ScoreFunction scoreFunction) {
                 if (counter.numHits() < candidates) {
                     logger.warn(String.format(
                             "Found fewer approximate matches [%d] than the requested number of candidates [%d]",
@@ -93,60 +106,7 @@ public class MatchHashesAndScoreQuery extends Query {
                     KthGreatest.Result kgr = counter.kthGreatest(candidates);
 
                     // Return an iterator over the doc ids >= the min candidate count.
-                    return new DocIdSetIterator() {
-
-                        // Important that this starts at -1. Need a boolean to denote that it has started iterating.
-                        private int docID = -1;
-                        private boolean started = false;
-
-                        // Track the number of ids emitted, and the number of ids with count = kgr.kthGreatest emitted.
-                        private int numEmitted = 0;
-                        private int numEq = 0;
-
-                        @Override
-                        public int docID() {
-                            return docID;
-                        }
-
-                        @Override
-                        public int nextDoc() {
-
-                            if (!started) {
-                                started = true;
-                                docID = counter.minKey() - 1;
-                            }
-
-                            // Ensure that docs with count = kgr.kthGreatest are only emitted when there are fewer
-                            // than `candidates` docs with count > kgr.kthGreatest.
-                            while (true) {
-                                if (numEmitted == candidates || docID + 1 > counter.maxKey()) {
-                                    docID = DocIdSetIterator.NO_MORE_DOCS;
-                                    return docID();
-                                } else {
-                                    docID++;
-                                    if (counter.get(docID) > kgr.kthGreatest) {
-                                        numEmitted++;
-                                        return docID();
-                                    } else if (counter.get(docID) == kgr.kthGreatest && numEq < candidates - kgr.numGreaterThan) {
-                                        numEq++;
-                                        numEmitted++;
-                                        return docID();
-                                    }
-                                }
-                            }
-                        }
-
-                        @Override
-                        public int advance(int target) {
-                            while (docID < target) nextDoc();
-                            return docID();
-                        }
-
-                        @Override
-                        public long cost() {
-                            return counter.numHits();
-                        }
-                    };
+                    return new MaxScoreDocIdSetIterator(counter,kgr,scoreFunction,candidates,maxScore);
                 }
             }
 
@@ -170,7 +130,7 @@ public class MatchHashesAndScoreQuery extends Query {
                 ScoreFunction scoreFunction = scoreFunctionBuilder.apply(context);
                 LeafReader reader = context.reader();
                 HitCounter counter = countHits(reader);
-                DocIdSetIterator disi = buildDocIdSetIterator(counter);
+                DocIdSetIterator disi =  buildDocIdSetIterator(counter,scoreFunction);
 
                 return new Scorer(this) {
                     @Override
@@ -186,9 +146,10 @@ public class MatchHashesAndScoreQuery extends Query {
                     @Override
                     public float score() {
                         int docID = docID();
+
                         // TODO: how does it get to this state? This error did come up once in some local testing.
                         if (docID == DocIdSetIterator.NO_MORE_DOCS) return 0f;
-                        else return (float) scoreFunction.score(docID, counter.get(docID));
+                        else return (float) ((MaxScoreDocIdSetIterator) disi).curScore();
                     }
 
                     @Override

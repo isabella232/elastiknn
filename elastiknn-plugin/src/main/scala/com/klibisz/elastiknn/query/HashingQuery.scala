@@ -12,6 +12,8 @@ import org.apache.lucene.util.BytesRef
 import org.elasticsearch.common.lucene.search.function.{CombineFunction, LeafScoreFunction, ScoreFunction}
 
 class HashingQuery[V <: Vec, S <: StoredVec](field: String,
+                                             minScore: Double,
+                                             maxCandidatesToScan: Int,
                                              queryVec: V,
                                              candidates: Int,
                                              hashes: Array[HashAndFreq],
@@ -30,7 +32,9 @@ class HashingQuery[V <: Vec, S <: StoredVec](field: String,
       hashes,
       candidates,
       indexReader,
-      scoreFunction
+      scoreFunction,
+      minScore,
+      maxCandidatesToScan
     )
   }
 
